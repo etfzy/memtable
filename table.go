@@ -33,6 +33,20 @@ func (t *Table[K, V]) SelectByMainKey(mainkey K) (V, bool) {
 	return v, ok
 }
 
+func (t *Table[K, V]) SelectOneByCondition(cond func(row V) bool) (V, error) {
+	t.rwlock.RLock()
+	defer t.rwlock.RUnlock()
+
+	var result V
+	for _, row := range t.mRow {
+		if cond(row) {
+			return row, nil
+		}
+	}
+
+	return result, errors.New("not find...")
+}
+
 func (t *Table[K, V]) SelectByCondition(cond func(row V) bool) []V {
 	t.rwlock.RLock()
 	defer t.rwlock.RUnlock()
