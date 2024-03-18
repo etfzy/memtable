@@ -1,57 +1,59 @@
 package memtable
 
 import (
+	"encoding/json"
 	"errors"
 	"sync"
 )
 
-type Table struct {
+type Table[K comparable, V any] struct {
 	rwlock sync.RWMutex
-	mRow   map[string]any
+	mRow   map[K]V
 }
 
-func CreateTable() *Table {
-	return &Table{
+func CreateTable[K comparable, V any]() *Table[K, V] {
+	return &Table[K, V]{
 		rwlock: sync.RWMutex{},
-		mRow:   map[string]any{},
+		mRow:   map[K]V{},
 	}
 }
 
-func (t *Table) Insert(mainkey string, row any) {
+func (t *Table[K, V]) Insert(mainkey K, row V) {
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
 
 	t.mRow[mainkey] = row
 }
 
-func (t *Table) SelectByMainKey(mainkey string) any {
+func (t *Table[K, V]) SelectByMainKey(mainkey K) (V, bool) {
 	t.rwlock.RLock()
 	defer t.rwlock.RUnlock()
-	return t.mRow[mainkey]
+
+	v, ok := t.mRow[mainkey]
+	return v, ok
 }
 
-func (t *Table) SelectByCondition(cond func(row any) bool) []any {
+func (t *Table[K, V]) SelectByCondition(cond func(row V) bool) []V {
 	t.rwlock.RLock()
 	defer t.rwlock.RUnlock()
 
-	results := make([]any, 0, len(t.mRow))
+	results := make([]V, 0, len(t.mRow))
 	for _, row := range t.mRow {
 		if cond(row) {
-			temp := row
-			results = append(results, temp)
+			results = append(results, row)
 		}
 	}
 
 	return results
 }
 
-func (t *Table) UpdateByMainkey(mainkey string, cond func(row any) any) error {
+func (t *Table[K, V]) UpdateByMainkey(mainkey K, cond func(row V) V) error {
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
 
-	row := t.mRow[mainkey]
+	row, ok := t.mRow[mainkey]
 
-	if row == nil {
+	if !ok {
 		return errors.New("row not find...")
 	}
 	t.mRow[mainkey] = cond(row)
@@ -59,7 +61,7 @@ func (t *Table) UpdateByMainkey(mainkey string, cond func(row any) any) error {
 	return nil
 }
 
-func (t *Table) UpdateByCondition(cond func(row any) any) error {
+func (t *Table[K, V]) UpdateByCondition(cond func(row V) V) error {
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
 
@@ -70,22 +72,39 @@ func (t *Table) UpdateByCondition(cond func(row any) any) error {
 	return nil
 }
 
-func (t *Table) DelByMainkey(mainkey string) {
+func (t *Table[K, V]) DelByMainkey(mainkey K) (V, bool) {
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
-	delete(t.mRow, mainkey)
-	return
+
+	temp, ok := t.mRow[mainkey]
+
+	if ok {
+		delete(t.mRow, mainkey)
+	}
+
+	return temp, ok
 }
 
-func (t *Table) DelByCondition(cond func(row any) bool) {
+func (t *Table[K, V]) DelByCondition(cond func(row V) bool) []V {
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
 
+	results := make([]V, 0, len(t.mRow))
 	for key, row := range t.mRow {
 		if cond(row) {
+			results = append(results, row)
 			delete(t.mRow, key)
 		}
 	}
 
-	return
+	return results
+}
+
+func (t *Table[K, V]) GetJsonData() string {
+	t.rwlock.Lock()
+	defer t.rwlock.Unlock()
+
+	temp, _ := json.Marshal(t)
+
+	return string(temp)
 }
