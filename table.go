@@ -47,6 +47,24 @@ func (t *Table[K, V]) SelectOneByCondition(cond func(row V) bool) (V, error) {
 	return result, errors.New("not find...")
 }
 
+func (t *Table[K, V]) SelectAndUpdateOnce(cond func(row V) bool, update func(row V) V) (K, bool) {
+	t.rwlock.Lock()
+	defer t.rwlock.Unlock()
+
+	var result K
+	var bup = false
+	for mainkey, row := range t.mRow {
+		if cond(row) {
+			result = mainkey
+			t.mRow[mainkey] = update(row)
+			bup = true
+			break
+		}
+	}
+
+	return result, bup
+}
+
 func (t *Table[K, V]) SelectByCondition(cond func(row V) bool) []V {
 	t.rwlock.RLock()
 	defer t.rwlock.RUnlock()
