@@ -136,7 +136,7 @@ func (t *Table[K, V]) GetJsonData() string {
 	t.rwlock.Lock()
 	defer t.rwlock.Unlock()
 
-	temp, _ := json.Marshal(t)
+	temp, _ := json.Marshal(t.mRow)
 
 	return string(temp)
 }
